@@ -1516,6 +1516,20 @@ setMethod("-", signature(e1 = "acs", e2 = "acs"), function(e1, e2) {
   if (proportion==T) header=.acs.combine.headers(num, den, "/")
   else header=.acs.combine.headers(num, den, ":")
   p=estimate(num)/estimate(den)
+  
+  # if any pair of estimates from num and den are both zero, it will produce NaN
+  # This will account for and correct this, making those values zero
+  p[(estimate(num) == 0 & estimate(den) == 0)] <- 0
+  # This will account for and correct this, making those values NA
+  # p[(estimate(num) == 0 & estimate(den) == 0)] <- NA
+
+  ## A second option
+  # this will account for the above NaN values, however it will produce
+  # either a zero or NA based on the presence or absence (respectively) of a non-NA MOE
+  # p[(estimate(num) == 0 & estimate(den) == 0 & !is.na(standard.error(num)) & !is.na(standard.error(den)))] <- 0
+  # p[(estimate(num) == 0 & estimate(den) == 0 & (is.na(standard.error(num)) | is.na(standard.error(den))))] <- NA
+
+
   if (proportion==T & all((p^2 * standard.error(den)^2)>0)){
     header$acs.units=factor("proportion", levels=.acs.unit.levels)
     if (verbose) {warning("** using formula for PROPORTIONS, which assumes that numerator is a SUBSET of denominator **")}
