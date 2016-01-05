@@ -1516,21 +1516,8 @@ setMethod("-", signature(e1 = "acs", e2 = "acs"), function(e1, e2) {
   if (proportion==T) header=.acs.combine.headers(num, den, "/")
   else header=.acs.combine.headers(num, den, ":")
   p=estimate(num)/estimate(den)
-  
-  # if any pair of estimates from num and den are both zero, it will produce NaN
-  # This will account for and correct this, making those values zero
-  p[(estimate(num) == 0 & estimate(den) == 0)] <- 0
-  # This will account for and correct this, making those values NA
-  # p[(estimate(num) == 0 & estimate(den) == 0)] <- NA
 
-  ## A second option
-  # this will account for the above NaN values, however it will produce
-  # either a zero or NA based on the presence or absence (respectively) of a non-NA MOE
-  # p[(estimate(num) == 0 & estimate(den) == 0 & !is.na(standard.error(num)) & !is.na(standard.error(den)))] <- 0
-  # p[(estimate(num) == 0 & estimate(den) == 0 & (is.na(standard.error(num)) | is.na(standard.error(den))))] <- NA
-
-
-  if (proportion==T & all((p^2 * standard.error(den)^2)>0)){
+  if (proportion==T & all((standard.error(num)^2 - (p^2 * standard.error(den)^2)) > 0, na.rm=T)){
     header$acs.units=factor("proportion", levels=.acs.unit.levels)
     if (verbose) {warning("** using formula for PROPORTIONS, which assumes that numerator is a SUBSET of denominator **")}
     NEW.ERROR=sqrt(standard.error(num)^2 - (p^2 * standard.error(den)^2))/estimate(den)}
@@ -1541,6 +1528,19 @@ setMethod("-", signature(e1 = "acs", e2 = "acs"), function(e1, e2) {
     header$acs.units=factor("ratio", levels=.acs.unit.levels)
     NEW.ERROR=sqrt(standard.error(num)^2 + (p^2 * standard.error(den)^2))/estimate(den)
   }
+
+  # Any derived ratio/proportion where the denominator is zero is suppressed, as its its SE
+  p[estimate(den) == 0] <- NaN
+  NEW.ERROR[estimate(den) == 0] <- NaN
+
+  if (any(is.nan(p) | is.nan(NEW.ERROR))) {
+    if (!any(estimate(den) == 0)) {
+      stop("Unhandled NaN")
+    } else if (verbose) {
+      print("Expected NaN present for zero denominators")
+    }
+  }
+
   acs.obj=new(Class="acs",
     endyear=header$endyear,
     span=header$span,
@@ -1552,7 +1552,8 @@ setMethod("-", signature(e1 = "acs", e2 = "acs"), function(e1, e2) {
     estimate=p,
     standard.error=NEW.ERROR)
   acs.obj=.acs.dimnames(acs.obj)
-  acs.obj}
+  acs.obj
+}
     
 setMethod("/", signature(e1 = "acs", e2 = "acs"), function(e1, e2) {
 # by default, use more conservative "ratio-style" dividing
